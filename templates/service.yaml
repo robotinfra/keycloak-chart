@@ -16,12 +16,10 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
-    {{- if .Values.mcpServer.enabled }}
     - port: {{ .Values.mcpServer.port }}
       targetPort: mcp
       protocol: TCP
       name: mcp
-    {{- end }}
   selector:
     {{- include "keycloak.selectorLabels" . | nindent 4 }}
 ---

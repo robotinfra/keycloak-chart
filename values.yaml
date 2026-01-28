@@ -10,13 +10,20 @@ image:
   pullPolicy: IfNotPresent
 
 # MCP Server sidecar configuration
+# Provides AI/LLM integration via Model Context Protocol
 mcpServer:
-  enabled: true
   image:
     repository: quay.io/sshaaf/keycloak-mcp-server
     tag: "latest"
     pullPolicy: IfNotPresent
   port: 8081
+  # Path where MCP server is exposed (must start with /)
+  path: /mcp
+  # Basic authentication for MCP endpoint (optional)
+  auth:
+    enabled: false
+    username: mcp
+    password: ""  # Will be auto-generated if empty
   resources:
     requests:
       cpu: 100m
@@ -35,6 +42,13 @@ admin:
 # Database configuration using CNPG
 database:
   enabled: true
+  # Database connection
+  host: postgresql-rw.database.svc.cluster.local
+  port: 5432
+  name: keycloak
+  username: keycloak
+  password: ""  # Will be auto-generated if empty
+  existingSecret: ""  # Use existing secret instead
   # CNPG Cluster configuration
   cnpg:
     instances: 3
@@ -48,17 +62,13 @@ database:
     backup:
       enabled: false
       # Configuration for backups if needed
-  # Database credentials
-  name: keycloak
-  username: keycloak
-  password: "" # Will be auto-generated if empty
-  existingSecret: "" # Use existing secret instead
 
 # Keycloak configuration
 keycloak:
-  # Proxy mode for ingress
+  # Proxy mode: edge (TLS termination at ingress), reencrypt, passthrough, none
+  # Use 'edge' when nginx ingress terminates TLS
   proxy: edge
-  # Cache configuration
+  # Cache: ispn (Infinispan) for distributed caching and clustering
   cache: ispn
   # Health check port
   healthPort: 9000

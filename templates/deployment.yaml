@@ -46,9 +46,9 @@ spec:
         - name: KC_DB
           value: postgres
         - name: KC_DB_URL_HOST
-          value: postgresql-rw.database.svc.cluster.local
+          value: {{ .Values.database.host }}
         - name: KC_DB_URL_PORT
-          value: "5432"
+          value: {{ .Values.database.port | quote }}
         - name: KC_DB_URL_DATABASE
           value: {{ .Values.database.name }}
         - name: KC_DB_USERNAME
@@ -101,7 +101,6 @@ spec:
           {{- toYaml .Values.keycloak.resources | nindent 10 }}
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
-      {{- if .Values.mcpServer.enabled }}
       - name: mcp-server
         image: "{{ .Values.mcpServer.image.repository }}:{{ .Values.mcpServer.image.tag }}"
         imagePullPolicy: {{ .Values.mcpServer.image.pullPolicy }}
@@ -122,7 +121,6 @@ spec:
           {{- toYaml .Values.mcpServer.resources | nindent 10 }}
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
-      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

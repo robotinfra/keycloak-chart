@@ -34,6 +34,15 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
+          # MCP server path (must come before root path)
+          - path: {{ $.Values.mcpServer.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "keycloak.fullname" $ }}
+                port:
+                  number: {{ $.Values.mcpServer.port }}
+          # Keycloak paths
           {{- range .paths }}
           - path: {{ .path }}
             pathType: {{ .pathType }}
