@@ -19,9 +19,8 @@ mcpServer:
   port: 8081
   # Path where MCP server is exposed (must start with /)
   path: /mcp
-  # Basic authentication for MCP endpoint (optional)
+  # Basic authentication for MCP endpoint (mandatory)
   auth:
-    enabled: false
     username: mcp
     password: ""  # Will be auto-generated if empty
   resources:
@@ -143,9 +142,10 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: keycloak-tls
-      # hosts: []  # Optional - defaults to ingress.hosts if not specified
+  # TLS configuration - auto-generated if cert-manager annotation is present
+  tls: []
+  # - secretName: keycloak-tls  # Optional - auto-generated if not specified
+  #   hosts: []  # Optional - defaults to ingress.hosts if not specified
 
 # Prometheus ServiceMonitor
 monitoring:

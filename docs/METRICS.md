@@ -1,10 +1,12 @@
 # Keycloak Metrics for Prometheus
 
-This document describes the metrics capabilities of Keycloak and how they integrate with Prometheus in the CC cluster.
+This document describes the metrics capabilities of Keycloak and how
+they integrate with Prometheus in the CC cluster.
 
 ## Overview
 
-Keycloak exposes comprehensive metrics through its `/metrics` endpoint when metrics are enabled. The chart automatically configures:
+Keycloak exposes comprehensive metrics through its `/metrics` endpoint
+when metrics are enabled. The chart automatically configures:
 
 - Metrics endpoint at `/metrics` on port 8080
 - ServiceMonitor resource for Prometheus Operator
@@ -21,6 +23,7 @@ keycloak:
 ```
 
 Access metrics:
+
 ```bash
 # Via port-forward
 kubectl port-forward svc/keycloak 8080:8080
@@ -132,7 +135,8 @@ spec:
 
 ### CC Cluster Configuration
 
-For the CC cluster, ensure the ServiceMonitor has labels matching your Prometheus configuration:
+For the CC cluster, ensure the ServiceMonitor has labels matching your
+Prometheus configuration:
 
 ```yaml
 # Example for CC cluster
@@ -149,6 +153,7 @@ monitoring:
 ### Useful PromQL Queries
 
 #### Memory Usage
+
 ```promql
 # Heap memory usage percentage
 (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) * 100
@@ -158,6 +163,7 @@ sum by (id) (jvm_memory_used_bytes)
 ```
 
 #### Request Rate
+
 ```promql
 # Requests per second
 rate(http_server_requests_seconds_count[5m])
@@ -170,6 +176,7 @@ sum(rate(http_server_requests_seconds_count{status!~"2.."}[5m]))
 ```
 
 #### Response Time
+
 ```promql
 # Average response time
 rate(http_server_requests_seconds_sum[5m]) / rate(http_server_requests_seconds_count[5m])
@@ -182,6 +189,7 @@ sum by (uri) (rate(http_server_requests_seconds_sum[5m])) / sum by (uri) (rate(h
 ```
 
 #### Database Connections
+
 ```promql
 # Active database connections
 hikaricp_connections_active
@@ -194,6 +202,7 @@ rate(hikaricp_connections_acquire_seconds_sum[5m]) / rate(hikaricp_connections_a
 ```
 
 #### GC Metrics
+
 ```promql
 # GC pause time rate
 rate(jvm_gc_pause_seconds_sum[5m])
@@ -203,6 +212,7 @@ rate(jvm_gc_pause_seconds_count[5m])
 ```
 
 #### Thread Pool
+
 ```promql
 # Thread count by state
 sum by (state) (jvm_threads_states_threads)
@@ -228,6 +238,7 @@ jvm_threads_live_threads / jvm_threads_peak_threads
 ### Example Dashboard Panels
 
 #### Request Rate Panel
+
 ```json
 {
   "targets": [{
@@ -238,10 +249,12 @@ jvm_threads_live_threads / jvm_threads_peak_threads
 ```
 
 #### Memory Usage Panel
+
 ```json
 {
   "targets": [{
-    "expr": "(jvm_memory_used_bytes{area='heap'} / jvm_memory_max_bytes{area='heap'}) * 100"
+    "expr": "(jvm_memory_used_bytes{area='heap'} /
+              jvm_memory_max_bytes{area='heap'}) * 100"
   }],
   "title": "Heap Memory Usage %"
 }
@@ -252,33 +265,40 @@ jvm_threads_live_threads / jvm_threads_peak_threads
 ### Recommended Alerts
 
 #### High Memory Usage
+
 ```yaml
 - alert: KeycloakHighMemoryUsage
-  expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) * 100 > 90
+  expr: (jvm_memory_used_bytes{area="heap"} /
+          jvm_memory_max_bytes{area="heap"}) * 100 > 90
   for: 5m
   annotations:
     summary: "Keycloak heap memory usage is above 90%"
 ```
 
 #### High Error Rate
+
 ```yaml
 - alert: KeycloakHighErrorRate
-  expr: sum(rate(http_server_requests_seconds_count{status!~"2.."}[5m])) / sum(rate(http_server_requests_seconds_count[5m])) > 0.05
+  expr: sum(rate(http_server_requests_seconds_count{status!~"2.."}[5m]))
+          / sum(rate(http_server_requests_seconds_count[5m])) > 0.05
   for: 5m
   annotations:
     summary: "Keycloak error rate is above 5%"
 ```
 
 #### Slow Response Time
+
 ```yaml
 - alert: KeycloakSlowResponses
-  expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m])) > 2
+  expr: histogram_quantile(0.95,
+          rate(http_server_requests_seconds_bucket[5m])) > 2
   for: 5m
   annotations:
     summary: "Keycloak 95th percentile response time is above 2 seconds"
 ```
 
 #### Database Connection Issues
+
 ```yaml
 - alert: KeycloakDatabaseConnectionPoolExhausted
   expr: hikaricp_connections_pending > 0
@@ -288,6 +308,7 @@ jvm_threads_live_threads / jvm_threads_peak_threads
 ```
 
 #### Frequent GC
+
 ```yaml
 - alert: KeycloakFrequentGC
   expr: rate(jvm_gc_pause_seconds_count[5m]) > 1
@@ -301,12 +322,15 @@ jvm_threads_live_threads / jvm_threads_peak_threads
 ### Metrics Not Appearing in Prometheus
 
 1. **Check ServiceMonitor labels**
+
    ```bash
    kubectl get servicemonitor keycloak -o yaml
    ```
+
    Ensure labels match Prometheus serviceMonitorSelector
 
 2. **Verify Prometheus discovery**
+
    ```bash
    # Check Prometheus targets
    kubectl port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090
@@ -314,6 +338,7 @@ jvm_threads_live_threads / jvm_threads_peak_threads
    ```
 
 3. **Check metrics endpoint**
+
    ```bash
    kubectl port-forward svc/keycloak 8080:8080
    curl http://localhost:8080/metrics
@@ -324,11 +349,13 @@ jvm_threads_live_threads / jvm_threads_peak_threads
 If specific metrics are missing:
 
 1. Verify Keycloak metrics are enabled:
+
    ```bash
    kubectl logs statefulset/keycloak | grep metrics
    ```
 
 2. Check Keycloak configuration:
+
    ```bash
    kubectl exec keycloak-0 -- curl -s localhost:9000/health
    ```
@@ -341,6 +368,7 @@ Some Keycloak metrics can have high cardinality (many unique label combinations)
 - Consider using metric relabeling to drop or aggregate high-cardinality labels
 
 Example relabel config in Prometheus:
+
 ```yaml
 metricRelabelings:
   - sourceLabels: [uri]
