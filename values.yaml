@@ -135,8 +135,7 @@ ingress:
           pathType: Prefix
   tls:
     - secretName: keycloak-tls
-      hosts:
-        - keycloak.example.com
+      # hosts: []  # Optional - defaults to ingress.hosts if not specified
 
 # Prometheus ServiceMonitor
 monitoring:
