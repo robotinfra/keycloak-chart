@@ -35,8 +35,8 @@ mcpServer:
 admin:
   username: admin
   # Generate a strong password and store in secret
-  password: "" # Will be auto-generated if empty
-  existingSecret: "" # Use existing secret instead
+  password: ""  # Will be auto-generated if empty
+  existingSecret: ""  # Use existing secret instead
 
 # Database configuration using CNPG
 database:
