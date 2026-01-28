@@ -39,6 +39,7 @@ spec:
           - --cache-stack=kubernetes
           - --health-enabled=true
           - --metrics-enabled={{ .Values.keycloak.metricsEnabled }}
+          - --http-enabled=true
           - --http-relative-path=/
           - --hostname-strict=false
           - --proxy-headers={{ .Values.keycloak.proxyHeaders }}
