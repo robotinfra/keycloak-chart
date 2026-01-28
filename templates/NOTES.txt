@@ -1,0 +1,119 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your Keycloak instance is being deployed with the following configuration:
+
+Chart Version: {{ .Chart.Version }}
+App Version: {{ .Chart.AppVersion }}
+Release Name: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+=============================================================================
+IMPORTANT: Initial Setup Required
+=============================================================================
+
+1. Get your admin credentials:
+
+   Username:
+   kubectl get secret {{ include "keycloak.fullname" . }}-admin \
+     -n {{ .Release.Namespace }} \
+     -o jsonpath='{.data.username}' | base64 -d && echo
+
+   Password:
+   kubectl get secret {{ include "keycloak.fullname" . }}-admin \
+     -n {{ .Release.Namespace }} \
+     -o jsonpath='{.data.password}' | base64 -d && echo
+
+2. Wait for Keycloak to be ready:
+
+   kubectl wait --for=condition=ready pod \
+     -l app.kubernetes.io/name={{ include "keycloak.name" . }} \
+     -n {{ .Release.Namespace }} \
+     --timeout=600s
+
+3. Access Keycloak:
+
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+   External URL: https://{{ .host }}
+{{- end }}
+{{- else }}
+   Port-forward to access locally:
+   kubectl port-forward svc/{{ include "keycloak.fullname" . }} \
+     -n {{ .Release.Namespace }} 8080:{{ .Values.service.port }}
+
+   Then access: http://localhost:8080
+{{- end }}
+
+=============================================================================
+Database Information
+=============================================================================
+
+{{- if .Values.database.enabled }}
+Database: {{ .Values.database.name }}
+CNPG Cluster: postgresql (in database namespace)
+Username: {{ .Values.database.username }}
+
+Check database status:
+kubectl get database {{ include "keycloak.fullname" . }}-db
+{{- else }}
+External database configured
+{{- end }}
+
+=============================================================================
+MCP Server
+=============================================================================
+
+{{- if .Values.mcpServer.enabled }}
+The Keycloak MCP server is running as a sidecar container.
+
+Access via port-forward:
+kubectl port-forward svc/{{ include "keycloak.fullname" . }} \
+  -n {{ .Release.Namespace }} {{ .Values.mcpServer.port }}:{{ .Values.mcpServer.port }}
+
+MCP Server URL: http://localhost:{{ .Values.mcpServer.port }}
+
+Configure MCP client authentication:
+1. Create a client in Keycloak admin console
+2. Get a token using the provided credentials
+3. Configure your MCP client with the Bearer token
+{{- else }}
+MCP server is disabled
+{{- end }}
+
+=============================================================================
+Monitoring
+=============================================================================
+
+{{- if and .Values.monitoring.enabled .Values.keycloak.metricsEnabled }}
+Metrics enabled: Yes
+Metrics endpoint: /metrics
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+ServiceMonitor created for Prometheus Operator
+{{- end }}
+
+Access metrics:
+kubectl port-forward svc/{{ include "keycloak.fullname" . }} \
+  -n {{ .Release.Namespace }} 8080:{{ .Values.service.port }}
+curl http://localhost:8080/metrics
+{{- else }}
+Metrics disabled
+{{- end }}
+
+=============================================================================
+Next Steps
+=============================================================================
+
+1. Login to the admin console with the credentials above
+2. Create your first realm or use the master realm
+3. Configure identity providers, users, and clients
+4. Set up authentication flows and policies
+{{- if .Values.mcpServer.enabled }}
+5. Configure MCP server client for AI/LLM integration
+{{- end }}
+
+For more information:
+- Keycloak Docs: https://www.keycloak.org/documentation
+- Chart Repository: https://github.com/bclermont/keycloak-chart
+- Report Issues: https://github.com/bclermont/keycloak-chart/issues
+
+=============================================================================
