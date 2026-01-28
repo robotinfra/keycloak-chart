@@ -1,0 +1,94 @@
+{{- if .Values.monitoring.prometheusRule.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "keycloak.fullname" . }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: keycloak.rules
+      interval: {{ .Values.monitoring.prometheusRule.interval }}
+      rules:
+        # High Memory Usage Alert
+        - alert: KeycloakHighMemoryUsage
+          expr: |
+            (jvm_memory_used_bytes{job="{{ include "keycloak.fullname" . }}",area="heap"}
+              / jvm_memory_max_bytes{job="{{ include "keycloak.fullname" . }}",area="heap"})
+              * 100 > {{ .Values.monitoring.prometheusRule.rules.highMemoryThreshold }}
+          for: 5m
+          labels:
+            severity: warning
+            component: keycloak
+          annotations:
+            summary: "Keycloak high memory usage"
+            description: |
+              Keycloak heap memory usage is above {{ .Values.monitoring.prometheusRule.rules.highMemoryThreshold }}%
+              (current: {{`{{ $value | humanizePercentage }}`}})
+
+        # High Error Rate Alert
+        - alert: KeycloakHighErrorRate
+          expr: |
+            (sum(rate(http_server_requests_seconds_count{job="{{ include "keycloak.fullname" . }}",status!~"2.."}[5m]))
+              / sum(rate(http_server_requests_seconds_count{job="{{ include "keycloak.fullname" . }}"}[5m])))
+              > {{ .Values.monitoring.prometheusRule.rules.highErrorRateThreshold }}
+          for: 5m
+          labels:
+            severity: critical
+            component: keycloak
+          annotations:
+            summary: "Keycloak high error rate"
+            description: |
+              Keycloak error rate is above {{ .Values.monitoring.prometheusRule.rules.highErrorRateThreshold | float64 | mulf 100 }}%
+              (current: {{`{{ $value | humanizePercentage }}`}})
+
+        # Slow Response Time Alert
+        - alert: KeycloakSlowResponseTime
+          expr: |
+            histogram_quantile(0.95,
+              rate(http_server_requests_seconds_bucket{job="{{ include "keycloak.fullname" . }}"}[5m]))
+              > {{ .Values.monitoring.prometheusRule.rules.slowResponseThreshold }}
+          for: 5m
+          labels:
+            severity: warning
+            component: keycloak
+          annotations:
+            summary: "Keycloak slow response time"
+            description: |
+              Keycloak 95th percentile response time is above {{ .Values.monitoring.prometheusRule.rules.slowResponseThreshold }}s
+              (current: {{`{{ $value | humanizeDuration }}`}})
+
+        # Database Connection Issues Alert
+        - alert: KeycloakDatabaseConnectionIssues
+          expr: |
+            hikaricp_connections_active{job="{{ include "keycloak.fullname" . }}"}
+              / hikaricp_connections_max{job="{{ include "keycloak.fullname" . }}"}
+              > {{ .Values.monitoring.prometheusRule.rules.dbConnectionThreshold }}
+          for: 5m
+          labels:
+            severity: warning
+            component: keycloak
+          annotations:
+            summary: "Keycloak database connection pool nearly exhausted"
+            description: |
+              Keycloak is using more than {{ .Values.monitoring.prometheusRule.rules.dbConnectionThreshold | float64 | mulf 100 }}%
+              of available database connections (current: {{`{{ $value | humanizePercentage }}`}})
+
+        # Frequent GC Alert
+        - alert: KeycloakFrequentGC
+          expr: |
+            rate(jvm_gc_pause_seconds_count{job="{{ include "keycloak.fullname" . }}"}[5m])
+              > {{ .Values.monitoring.prometheusRule.rules.gcFrequencyThreshold }}
+          for: 10m
+          labels:
+            severity: warning
+            component: keycloak
+          annotations:
+            summary: "Keycloak frequent garbage collection"
+            description: |
+              Keycloak is experiencing frequent GC pauses
+              (rate: {{`{{ $value | humanize }}`}} GC/s, threshold: {{ .Values.monitoring.prometheusRule.rules.gcFrequencyThreshold }})
+{{- end }}

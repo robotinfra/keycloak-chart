@@ -262,60 +262,31 @@ jvm_threads_live_threads / jvm_threads_peak_threads
 
 ## Alerting Rules
 
-### Recommended Alerts
-
-#### High Memory Usage
-
-```yaml
-- alert: KeycloakHighMemoryUsage
-  expr: (jvm_memory_used_bytes{area="heap"} /
-          jvm_memory_max_bytes{area="heap"}) * 100 > 90
-  for: 5m
-  annotations:
-    summary: "Keycloak heap memory usage is above 90%"
-```
-
-#### High Error Rate
+The chart includes a PrometheusRule CRD with pre-configured alert rules.
+Enable and configure them in your values:
 
 ```yaml
-- alert: KeycloakHighErrorRate
-  expr: sum(rate(http_server_requests_seconds_count{status!~"2.."}[5m]))
-          / sum(rate(http_server_requests_seconds_count[5m])) > 0.05
-  for: 5m
-  annotations:
-    summary: "Keycloak error rate is above 5%"
+monitoring:
+  prometheusRule:
+    enabled: true
+    rules:
+      highMemoryThreshold: 90  # Alert when heap > 90%
+      highErrorRateThreshold: 0.05  # Alert when error rate > 5%
+      slowResponseThreshold: 2  # Alert when p95 latency > 2s
+      dbConnectionThreshold: 0.8  # Alert when connections > 80%
+      gcFrequencyThreshold: 1  # Alert when GC rate > 1/s
 ```
 
-#### Slow Response Time
+### Included Alerts
 
-```yaml
-- alert: KeycloakSlowResponses
-  expr: histogram_quantile(0.95,
-          rate(http_server_requests_seconds_bucket[5m])) > 2
-  for: 5m
-  annotations:
-    summary: "Keycloak 95th percentile response time is above 2 seconds"
-```
+- **KeycloakHighMemoryUsage**: Heap memory usage above threshold
+- **KeycloakHighErrorRate**: HTTP error rate above threshold
+- **KeycloakSlowResponseTime**: 95th percentile response time too slow
+- **KeycloakDatabaseConnectionIssues**: Connection pool nearly exhausted
+- **KeycloakFrequentGC**: Excessive garbage collection activity
 
-#### Database Connection Issues
-
-```yaml
-- alert: KeycloakDatabaseConnectionPoolExhausted
-  expr: hikaricp_connections_pending > 0
-  for: 2m
-  annotations:
-    summary: "Keycloak has pending database connections"
-```
-
-#### Frequent GC
-
-```yaml
-- alert: KeycloakFrequentGC
-  expr: rate(jvm_gc_pause_seconds_count[5m]) > 1
-  for: 5m
-  annotations:
-    summary: "Keycloak is experiencing frequent garbage collection"
-```
+The PrometheusRule is created at:
+`templates/prometheusrule.yaml`
 
 ## Troubleshooting
 

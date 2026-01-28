@@ -147,7 +147,7 @@ ingress:
   # - secretName: keycloak-tls  # Optional - auto-generated if not specified
   #   hosts: []  # Optional - defaults to ingress.hosts if not specified
 
-# Prometheus ServiceMonitor
+# Prometheus ServiceMonitor and Alert Rules
 monitoring:
   enabled: true
   # ServiceMonitor configuration for Prometheus Operator
@@ -157,6 +157,19 @@ monitoring:
     scrapeTimeout: 10s
     labels: {}
     # Additional labels for ServiceMonitor selector
+
+  # PrometheusRule configuration for alert rules
+  prometheusRule:
+    enabled: true
+    interval: 30s
+    labels: {}
+    # Additional labels for PrometheusRule selector
+    rules:
+      highMemoryThreshold: 90  # Percentage
+      highErrorRateThreshold: 0.05  # 5% error rate
+      slowResponseThreshold: 2  # Seconds
+      dbConnectionThreshold: 0.8  # 80% of max connections
+      gcFrequencyThreshold: 1  # GC pauses per second
 
 # Pod Security Context
 podSecurityContext:
