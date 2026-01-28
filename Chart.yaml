@@ -15,8 +15,8 @@ keywords:
   - oauth2
   - oidc
 maintainers:
-  - name: bclermont
-home: https://github.com/bclermont/keycloak-chart
+  - name: robotinfra
+home: https://github.com/robotinfra/keycloak-chart
 sources:
   - https://github.com/keycloak/keycloak
   - https://github.com/sshaaf/keycloak-mcp-server

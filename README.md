@@ -27,10 +27,10 @@ Keycloak Helm chart with CloudNativePG (CNPG) PostgreSQL database and MCP server
 
 ```bash
 # Install with default values
-helm install keycloak oci://ghcr.io/bclermont/keycloak-chart
+helm install keycloak oci://ghcr.io/robotinfra/keycloak
 
 # Install with custom values
-helm install keycloak oci://ghcr.io/bclermont/keycloak-chart \
+helm install keycloak oci://ghcr.io/robotinfra/keycloak \
   --set ingress.hosts[0].host=keycloak.example.com \
   --set ingress.tls[0].hosts[0]=keycloak.example.com
 ```

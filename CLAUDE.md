@@ -105,4 +105,4 @@ monitoring:
 
 ## Repository
 
-<https://github.com/bclermont/keycloak-chart>
+<https://github.com/robotinfra/keycloak-chart>
