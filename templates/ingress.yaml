@@ -1,4 +1,6 @@
 {{- if .Values.ingress.enabled -}}
+---
+# Main Keycloak Ingress (no authentication)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -6,15 +8,6 @@ metadata:
   labels:
     {{- include "keycloak.labels" . | nindent 4 }}
   annotations:
-    # MCP path requires authentication
-    nginx.ingress.kubernetes.io/auth-type: basic
-    nginx.ingress.kubernetes.io/auth-secret: {{ include "keycloak.fullname" . }}-mcp-auth
-    nginx.ingress.kubernetes.io/auth-realm: "Keycloak MCP Server"
-    nginx.ingress.kubernetes.io/auth-snippet: |
-      # Only require auth for /mcp path
-      if ($request_uri !~ ^{{ .Values.mcpServer.path }}) {
-        return 200;
-      }
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -51,15 +44,7 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
-          # MCP server path (must come before root path)
-          - path: {{ $.Values.mcpServer.path }}
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "keycloak.fullname" $ }}
-                port:
-                  number: {{ $.Values.mcpServer.port }}
-          # Keycloak paths
+          # Keycloak paths only
           {{- range .paths }}
           - path: {{ .path }}
             pathType: {{ .pathType }}
@@ -69,5 +54,61 @@ spec:
                 port:
                   number: {{ $.Values.service.port }}
           {{- end }}
+    {{- end }}
+---
+# MCP Server Ingress (with basic authentication)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "keycloak.fullname" . }}-mcp
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: {{ include "keycloak.fullname" . }}-mcp-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Keycloak MCP Server"
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if or .Values.ingress.tls (hasKey .Values.ingress.annotations "cert-manager.io/cluster-issuer") }}
+  tls:
+    {{- if .Values.ingress.tls }}
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- if .hosts }}
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- else }}
+        {{- range $.Values.ingress.hosts }}
+        - {{ .host | quote }}
+        {{- end }}
+        {{- end }}
+      secretName: {{ .secretName | default (printf "%s-tls" (include "keycloak.fullname" $)) }}
+    {{- end }}
+    {{- else }}
+    - hosts:
+        {{- range .Values.ingress.hosts }}
+        - {{ .host | quote }}
+        {{- end }}
+      secretName: {{ include "keycloak.fullname" . }}-tls
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          - path: {{ $.Values.mcpServer.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "keycloak.fullname" $ }}
+                port:
+                  number: {{ $.Values.mcpServer.port }}
     {{- end }}
 {{- end }}
