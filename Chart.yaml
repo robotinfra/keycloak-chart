@@ -1,0 +1,22 @@
+---
+apiVersion: v2
+name: keycloak
+description: |
+  Keycloak Helm chart with CNPG PostgreSQL database and MCP server
+  integration
+type: application
+version: 0.1.0
+appVersion: "26.0.5"
+keywords:
+  - keycloak
+  - identity
+  - access-management
+  - sso
+  - oauth2
+  - oidc
+maintainers:
+  - name: bclermont
+home: https://github.com/bclermont/keycloak-chart
+sources:
+  - https://github.com/keycloak/keycloak
+  - https://github.com/sshaaf/keycloak-mcp-server

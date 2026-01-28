@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "keycloak.fullname" . }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  serviceName: {{ include "keycloak.fullname" . }}-headless
+  selector:
+    matchLabels:
+      {{- include "keycloak.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "keycloak.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: keycloak
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+          - start
+          - --cache={{ .Values.keycloak.cache }}
+          - --cache-stack=kubernetes
+          - --health-enabled=true
+          - --metrics-enabled={{ .Values.keycloak.metricsEnabled }}
+          - --http-relative-path=/
+          - --hostname-strict=false
+          - --proxy={{ .Values.keycloak.proxy }}
+        env:
+        - name: KC_DB
+          value: postgres
+        - name: KC_DB_URL_HOST
+          value: postgresql-rw.database.svc.cluster.local
+        - name: KC_DB_URL_PORT
+          value: "5432"
+        - name: KC_DB_URL_DATABASE
+          value: {{ .Values.database.name }}
+        - name: KC_DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.existingSecret | default (printf "%s-db-credentials" (include "keycloak.fullname" .)) }}
+              key: username
+        - name: KC_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.existingSecret | default (printf "%s-db-credentials" (include "keycloak.fullname" .)) }}
+              key: password
+        - name: KEYCLOAK_ADMIN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.admin.existingSecret | default (printf "%s-admin" (include "keycloak.fullname" .)) }}
+              key: username
+        - name: KEYCLOAK_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.admin.existingSecret | default (printf "%s-admin" (include "keycloak.fullname" .)) }}
+              key: password
+        - name: jgroups.dns.query
+          value: {{ include "keycloak.fullname" . }}-headless
+        - name: JAVA_OPTS_APPEND
+          value: "-Djgroups.dns.query={{ include "keycloak.fullname" . }}-headless"
+        {{- with .Values.keycloak.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: https
+          containerPort: 8443
+          protocol: TCP
+        - name: health
+          containerPort: {{ .Values.keycloak.healthPort }}
+          protocol: TCP
+        - name: jgroups
+          containerPort: 7800
+          protocol: TCP
+        livenessProbe:
+          {{- toYaml .Values.keycloak.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.keycloak.readinessProbe | nindent 10 }}
+        startupProbe:
+          {{- toYaml .Values.keycloak.startupProbe | nindent 10 }}
+        resources:
+          {{- toYaml .Values.keycloak.resources | nindent 10 }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+      {{- if .Values.mcpServer.enabled }}
+      - name: mcp-server
+        image: "{{ .Values.mcpServer.image.repository }}:{{ .Values.mcpServer.image.tag }}"
+        imagePullPolicy: {{ .Values.mcpServer.image.pullPolicy }}
+        env:
+        - name: KC_URL
+          value: "http://localhost:8080"
+        - name: KC_REALM
+          value: "master"
+        - name: OIDC_CLIENT_ID
+          value: "mcp-server"
+        - name: QUARKUS_HTTP_PORT
+          value: "{{ .Values.mcpServer.port }}"
+        ports:
+        - name: mcp
+          containerPort: {{ .Values.mcpServer.port }}
+          protocol: TCP
+        resources:
+          {{- toYaml .Values.mcpServer.resources | nindent 10 }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

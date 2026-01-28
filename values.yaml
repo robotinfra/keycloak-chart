@@ -1,0 +1,181 @@
+---
+# Keycloak Helm Chart Values
+
+# Replica count for Keycloak StatefulSet
+replicaCount: 2
+
+image:
+  repository: quay.io/keycloak/keycloak
+  tag: "26.0.5"
+  pullPolicy: IfNotPresent
+
+# MCP Server sidecar configuration
+mcpServer:
+  enabled: true
+  image:
+    repository: quay.io/sshaaf/keycloak-mcp-server
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  port: 8081
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Keycloak admin credentials
+admin:
+  username: admin
+  # Generate a strong password and store in secret
+  password: "" # Will be auto-generated if empty
+  existingSecret: "" # Use existing secret instead
+
+# Database configuration using CNPG
+database:
+  enabled: true
+  # CNPG Cluster configuration
+  cnpg:
+    instances: 3
+    storage:
+      size: 10Gi
+      storageClass: longhorn
+    postgresql:
+      parameters:
+        max_connections: "200"
+        shared_buffers: "256MB"
+    backup:
+      enabled: false
+      # Configuration for backups if needed
+  # Database credentials
+  name: keycloak
+  username: keycloak
+  password: "" # Will be auto-generated if empty
+  existingSecret: "" # Use existing secret instead
+
+# Keycloak configuration
+keycloak:
+  # Proxy mode for ingress
+  proxy: edge
+  # Cache configuration
+  cache: ispn
+  # Health check port
+  healthPort: 9000
+  # Metrics endpoint
+  metricsEnabled: true
+
+  # Additional environment variables
+  extraEnv: []
+  # - name: CUSTOM_VAR
+  #   value: "value"
+
+  # Resource requirements
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1700Mi
+    limits:
+      cpu: 2000m
+      memory: 2000Mi
+
+  # Liveness probe
+  livenessProbe:
+    httpGet:
+      path: /health/live
+      port: 9000
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # Readiness probe
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 9000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # Startup probe
+  startupProbe:
+    httpGet:
+      path: /health/started
+      port: 9000
+    initialDelaySeconds: 15
+    periodSeconds: 1
+    timeoutSeconds: 5
+    failureThreshold: 600
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  httpsPort: 8443
+  # Headless service for StatefulSet discovery
+  headless:
+    enabled: true
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    nginx.ingress.kubernetes.io/proxy-buffers: "4 256k"
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "256k"
+  hosts:
+    - host: keycloak.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: keycloak-tls
+      hosts:
+        - keycloak.example.com
+
+# Prometheus ServiceMonitor
+monitoring:
+  enabled: true
+  # ServiceMonitor configuration for Prometheus Operator
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    # Additional labels for ServiceMonitor selector
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Security Context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}

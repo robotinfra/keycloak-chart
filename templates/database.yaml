@@ -1,0 +1,26 @@
+{{- if .Values.database.enabled }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "keycloak.fullname" . }}-db-credentials
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  username: {{ .Values.database.username | quote }}
+  password: {{ .Values.database.password | default (randAlphaNum 32) | quote }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: {{ include "keycloak.fullname" . }}-db
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  name: {{ .Values.database.name }}
+  cluster:
+    name: postgresql
+  owner: {{ .Values.database.username }}
+  ensure: present
+{{- end }}
