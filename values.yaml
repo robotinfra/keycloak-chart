@@ -41,6 +41,8 @@ admin:
 # Database configuration using CNPG
 database:
   enabled: true
+  # Create Database CRD (set to false if deploying to different namespace)
+  createDatabaseCRD: true
   # Database connection
   host: postgresql-rw.database.svc.cluster.local
   port: 5432
