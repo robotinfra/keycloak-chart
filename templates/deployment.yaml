@@ -41,7 +41,7 @@ spec:
           - --metrics-enabled={{ .Values.keycloak.metricsEnabled }}
           - --http-relative-path=/
           - --hostname-strict=false
-          - --proxy={{ .Values.keycloak.proxy }}
+          - --proxy-headers={{ .Values.keycloak.proxyHeaders }}
         env:
         - name: KC_DB
           value: postgres

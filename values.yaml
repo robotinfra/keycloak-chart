@@ -64,9 +64,9 @@ database:
 
 # Keycloak configuration
 keycloak:
-  # Proxy mode: edge (TLS termination at ingress), reencrypt, passthrough, none
-  # Use 'edge' when nginx ingress terminates TLS
-  proxy: edge
+  # Proxy headers mode: xforwarded (for TLS termination at ingress), forwarded
+  # Use 'xforwarded' when nginx ingress terminates TLS
+  proxyHeaders: xforwarded
   # Cache: ispn (Infinispan) for distributed caching and clustering
   cache: ispn
   # Health check port
