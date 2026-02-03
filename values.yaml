@@ -24,7 +24,7 @@ mcpServer:
     username: mcp
     password: ""  # Will be auto-generated if empty
   # OIDC client configuration
-  # Automatically creates and configures OIDC client for MCP server authentication
+  # Automatically creates and configures OIDC client for MCP server
   oidcClient:
     enabled: true
     clientId: mcp-server
@@ -32,7 +32,7 @@ mcpServer:
     description: OIDC client for MCP server authentication
     realm: master
     # OAuth2 flows
-    directAccessGrants: true  # Enable password grant (Resource Owner Password Credentials)
+    directAccessGrants: true  # Enable password grant
     standardFlow: true        # Enable authorization code flow
     serviceAccounts: false    # Disable service accounts
     authorization: false      # Disable authorization services
