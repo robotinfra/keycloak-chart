@@ -56,7 +56,7 @@ spec:
           {{- end }}
     {{- end }}
 ---
-# MCP Server Ingress (with basic authentication)
+# MCP Server Ingress (OIDC authentication via MCP server)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -64,9 +64,6 @@ metadata:
   labels:
     {{- include "keycloak.labels" . | nindent 4 }}
   annotations:
-    nginx.ingress.kubernetes.io/auth-type: basic
-    nginx.ingress.kubernetes.io/auth-secret: {{ include "keycloak.fullname" . }}-mcp-auth
-    nginx.ingress.kubernetes.io/auth-realm: "Keycloak MCP Server"
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
