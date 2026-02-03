@@ -36,24 +36,25 @@ spec:
           set -e
           echo "Setting up OIDC client for MCP server..."
 
-          # Wait for Keycloak to be ready
-          echo "Waiting for Keycloak to be ready..."
-          until curl -sf http://{{ include "keycloak.fullname" . }}:{{ .Values.service.port }}/health/ready; do
-            echo "Keycloak not ready yet, waiting..."
-            sleep 10
-          done
-
-          echo "Keycloak is ready!"
-
-          # Configure kcadm.sh
-          echo "Authenticating with Keycloak admin..."
-          /opt/keycloak/bin/kcadm.sh config credentials \
+          # Wait for Keycloak and authenticate
+          echo "Waiting for Keycloak to be ready and authenticating..."
+          MAX_ATTEMPTS=60
+          ATTEMPT=0
+          until /opt/keycloak/bin/kcadm.sh config credentials \
             --server http://{{ include "keycloak.fullname" . }}:{{ .Values.service.port }} \
             --realm {{ .Values.mcpServer.oidcClient.realm }} \
             --user "$KEYCLOAK_ADMIN" \
-            --password "$KEYCLOAK_ADMIN_PASSWORD"
+            --password "$KEYCLOAK_ADMIN_PASSWORD" 2>&1; do
+            ATTEMPT=$((ATTEMPT+1))
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "ERROR: Keycloak did not become ready after $MAX_ATTEMPTS attempts"
+              exit 1
+            fi
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Keycloak not ready yet, waiting 10s..."
+            sleep 10
+          done
 
-          echo "Authenticated successfully"
+          echo "Keycloak is ready and authenticated successfully"
 
           # Check if client already exists
           CLIENT_ID="{{ .Values.mcpServer.oidcClient.clientId }}"
