@@ -21,6 +21,35 @@ Keycloak Helm chart with CloudNativePG (CNPG) PostgreSQL database and MCP server
 - cert-manager (optional, for TLS)
 - Prometheus Operator (optional, for metrics)
 
+### CloudNativePG Configuration
+
+The chart automatically creates database credentials in both the application and database namespaces. For CNPG to sync the password to PostgreSQL, add a managed role to your CNPG Cluster:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgresql
+  namespace: database
+spec:
+  # ... other config ...
+  managed:
+    roles:
+    - name: keycloak
+      ensure: present
+      login: true
+      passwordSecret:
+        name: keycloak-db-credentials  # Matches chart secret name
+```
+
+**How it works:**
+1. Chart creates `keycloak-db-credentials` secret in both namespaces
+2. CNPG watches the secret in the database namespace
+3. CNPG automatically syncs the password to the PostgreSQL user
+4. Keycloak connects successfully using the same secret
+
+This eliminates manual password synchronization and ensures consistency.
+
 ## Installation
 
 ### Quick Start

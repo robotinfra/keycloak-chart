@@ -23,6 +23,19 @@ mcpServer:
   auth:
     username: mcp
     password: ""  # Will be auto-generated if empty
+  # OIDC client configuration
+  # Automatically creates and configures OIDC client for MCP server authentication
+  oidcClient:
+    enabled: true
+    clientId: mcp-server
+    name: MCP Server
+    description: OIDC client for MCP server authentication
+    realm: master
+    # OAuth2 flows
+    directAccessGrants: true  # Enable password grant (Resource Owner Password Credentials)
+    standardFlow: true        # Enable authorization code flow
+    serviceAccounts: false    # Disable service accounts
+    authorization: false      # Disable authorization services
   resources:
     requests:
       cpu: 100m
@@ -43,6 +56,10 @@ database:
   enabled: true
   # Create Database CRD (set to false if deploying to different namespace)
   createDatabaseCRD: true
+  # Database namespace (where CNPG cluster lives)
+  namespace: database
+  # CNPG cluster name
+  clusterName: postgresql
   # Database connection
   host: postgresql-rw.database.svc.cluster.local
   port: 5432
@@ -50,7 +67,7 @@ database:
   username: keycloak
   password: ""  # Will be auto-generated if empty
   existingSecret: ""  # Use existing secret instead
-  # CNPG Cluster configuration
+  # CNPG Cluster configuration (for reference/documentation)
   cnpg:
     instances: 3
     storage:

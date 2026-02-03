@@ -5,7 +5,7 @@ description: |
   Keycloak Helm chart with CNPG PostgreSQL database and MCP server
   integration
 type: application
-version: 0.4.6
+version: 0.5.0
 appVersion: "26.0.5"
 keywords:
   - keycloak

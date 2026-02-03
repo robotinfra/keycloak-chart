@@ -1,0 +1,143 @@
+{{- if .Values.mcpServer.oidcClient.enabled }}
+---
+# Job to create OIDC client for MCP server in Keycloak
+# Runs post-install and post-upgrade, idempotent (checks if client exists)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "keycloak.fullname" . }}-oidc-client
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    app.kubernetes.io/component: oidc-client-setup
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        {{- include "keycloak.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: oidc-client-setup
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: oidc-client-setup
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          echo "Setting up OIDC client for MCP server..."
+
+          # Wait for Keycloak to be ready
+          echo "Waiting for Keycloak to be ready..."
+          until curl -sf http://{{ include "keycloak.fullname" . }}:{{ .Values.service.port }}/health/ready; do
+            echo "Keycloak not ready yet, waiting..."
+            sleep 10
+          done
+
+          echo "Keycloak is ready!"
+
+          # Configure kcadm.sh
+          echo "Authenticating with Keycloak admin..."
+          /opt/keycloak/bin/kcadm.sh config credentials \
+            --server http://{{ include "keycloak.fullname" . }}:{{ .Values.service.port }} \
+            --realm {{ .Values.mcpServer.oidcClient.realm }} \
+            --user "$KEYCLOAK_ADMIN" \
+            --password "$KEYCLOAK_ADMIN_PASSWORD"
+
+          echo "Authenticated successfully"
+
+          # Check if client already exists
+          CLIENT_ID="{{ .Values.mcpServer.oidcClient.clientId }}"
+          echo "Checking if client '$CLIENT_ID' exists..."
+
+          if /opt/keycloak/bin/kcadm.sh get clients -r {{ .Values.mcpServer.oidcClient.realm }} --fields clientId 2>/dev/null | grep -q "\"$CLIENT_ID\""; then
+            echo "Client '$CLIENT_ID' already exists"
+
+            # Get client UUID
+            CLIENT_UUID=$(/opt/keycloak/bin/kcadm.sh get clients -r {{ .Values.mcpServer.oidcClient.realm }} -q clientId="$CLIENT_ID" --fields id 2>/dev/null | grep -o '"id" : "[^"]*"' | cut -d'"' -f4)
+            echo "Client UUID: $CLIENT_UUID"
+          else
+            echo "Creating OIDC client '$CLIENT_ID'..."
+
+            {{- $firstHost := index .Values.ingress.hosts 0 }}
+            {{- $hostname := $firstHost.host }}
+
+            # Create client
+            CLIENT_UUID=$(/opt/keycloak/bin/kcadm.sh create clients -r {{ .Values.mcpServer.oidcClient.realm }} \
+              -s clientId="$CLIENT_ID" \
+              -s "name={{ .Values.mcpServer.oidcClient.name }}" \
+              -s "description={{ .Values.mcpServer.oidcClient.description }}" \
+              -s enabled=true \
+              -s clientAuthenticatorType=client-secret \
+              -s "redirectUris=[\"https://{{ $hostname }}{{ .Values.mcpServer.path }}/*\"]" \
+              -s "webOrigins=[\"https://{{ $hostname }}\"]" \
+              -s publicClient=false \
+              -s directAccessGrantsEnabled={{ .Values.mcpServer.oidcClient.directAccessGrants }} \
+              -s standardFlowEnabled={{ .Values.mcpServer.oidcClient.standardFlow }} \
+              -s serviceAccountsEnabled={{ .Values.mcpServer.oidcClient.serviceAccounts }} \
+              -s authorizationServicesEnabled={{ .Values.mcpServer.oidcClient.authorization }} \
+              -i 2>/dev/null)
+
+            echo "Client created successfully"
+            echo "Client UUID: $CLIENT_UUID"
+          fi
+
+          # Get client secret
+          echo "Retrieving client secret..."
+          CLIENT_SECRET=$(/opt/keycloak/bin/kcadm.sh get "clients/$CLIENT_UUID/client-secret" -r {{ .Values.mcpServer.oidcClient.realm }} 2>/dev/null | grep -o '"value" : "[^"]*"' | cut -d'"' -f4)
+
+          if [ -z "$CLIENT_SECRET" ]; then
+            echo "ERROR: Failed to retrieve client secret"
+            exit 1
+          fi
+
+          echo "Client secret retrieved successfully"
+
+          # Save to Kubernetes secret
+          echo "Updating Kubernetes secret with client credentials..."
+          kubectl create secret generic {{ include "keycloak.fullname" . }}-mcp-client \
+            --from-literal=client-id="$CLIENT_ID" \
+            --from-literal=client-secret="$CLIENT_SECRET" \
+            --namespace={{ .Release.Namespace }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl label secret {{ include "keycloak.fullname" . }}-mcp-client \
+            app.kubernetes.io/name={{ include "keycloak.name" . }} \
+            app.kubernetes.io/instance={{ .Release.Name }} \
+            app.kubernetes.io/managed-by={{ .Release.Service }} \
+            --overwrite
+
+          echo "OIDC client setup complete!"
+          echo "Client ID: $CLIENT_ID"
+          echo "Client secret stored in secret: {{ include "keycloak.fullname" . }}-mcp-client"
+        env:
+        - name: KEYCLOAK_ADMIN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.admin.existingSecret | default (printf "%s-admin" (include "keycloak.fullname" .)) }}
+              key: username
+        - name: KEYCLOAK_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.admin.existingSecret | default (printf "%s-admin" (include "keycloak.fullname" .)) }}
+              key: password
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+      serviceAccountName: {{ include "keycloak.fullname" . }}-oidc-setup
+{{- end }}
