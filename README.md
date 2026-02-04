@@ -348,6 +348,30 @@ Check sidecar logs:
 kubectl logs statefulset/keycloak -c mcp-server
 ```
 
+### Manual setup script
+
+The chart includes a post-install script rendered with your specific values for manual setup or troubleshooting. Extract and run it:
+
+```bash
+# Extract the rendered script
+kubectl get configmap keycloak-post-install-script \
+  -n <namespace> -o jsonpath='{.data.post-install\.sh}' > post-install.sh
+
+# Make executable
+chmod +x post-install.sh
+
+# Run the script
+./post-install.sh
+```
+
+The script will:
+1. Wait for Keycloak to be ready
+2. Authenticate with the admin account
+3. Verify OIDC client setup
+4. Display all credentials and URLs
+
+All values (namespace, release name, URLs, etc.) are pre-filled from your Helm installation.
+
 ## License
 
 This chart is provided as-is. Keycloak is licensed under Apache License 2.0.
