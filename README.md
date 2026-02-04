@@ -21,9 +21,11 @@ Keycloak Helm chart with CloudNativePG (CNPG) PostgreSQL database and MCP server
 - cert-manager (optional, for TLS)
 - Prometheus Operator (optional, for metrics)
 
-### CloudNativePG Configuration
+### Infrastructure Requirements
 
-The chart automatically creates database credentials in both the application and database namespaces. For CNPG to sync the password to PostgreSQL, add a managed role to your CNPG Cluster:
+This chart assumes database infrastructure is managed separately (typically in a `database` namespace). The following resources must exist before installing this chart:
+
+#### 1. CNPG Cluster with Managed Role
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -32,23 +34,81 @@ metadata:
   name: postgresql
   namespace: database
 spec:
-  # ... other config ...
+  instances: 3
+  storage:
+    size: 10Gi
   managed:
     roles:
     - name: keycloak
       ensure: present
       login: true
       passwordSecret:
-        name: keycloak-db-credentials  # Matches chart secret name
+        name: keycloak-db-credentials  # CNPG watches this secret
 ```
 
-**How it works:**
-1. Chart creates `keycloak-db-credentials` secret in both namespaces
-2. CNPG watches the secret in the database namespace
-3. CNPG automatically syncs the password to the PostgreSQL user
-4. Keycloak connects successfully using the same secret
+#### 2. Database Credentials Secret
 
-This eliminates manual password synchronization and ensures consistency.
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keycloak-db-credentials
+  namespace: database
+  labels:
+    cnpg.io/reload: "true"
+type: kubernetes.io/basic-auth
+stringData:
+  username: keycloak
+  password: <same-password-as-chart-generates>
+```
+
+#### 3. Database CRD
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: keycloak
+  namespace: database
+spec:
+  name: keycloak
+  cluster:
+    name: postgresql
+  owner: keycloak
+  ensure: present
+```
+
+### How Password Sync Works
+
+1. **Helm chart** generates random password and creates `keycloak-db-credentials` secret in release namespace (e.g., `oidc`)
+2. **Infrastructure** creates matching secret in database namespace with same password
+3. **CNPG** watches the secret (via `cnpg.io/reload` label) and syncs password to PostgreSQL user
+4. **Keycloak** reads secret from its namespace and connects successfully
+
+**Note:** The password must match between both secrets. For fresh installs, generate the password first, then use it in both the infrastructure secret and chart installation:
+
+```bash
+# Generate password
+PASSWORD=$(openssl rand -base64 32)
+
+# Create infrastructure secret
+kubectl create secret generic keycloak-db-credentials \
+  --namespace=database \
+  --from-literal=username=keycloak \
+  --from-literal=password="$PASSWORD"
+kubectl label secret keycloak-db-credentials -n database cnpg.io/reload=true
+
+# Install chart with same password
+helm install keycloak oci://ghcr.io/robotinfra/keycloak \
+  --namespace=oidc \
+  --set database.password="$PASSWORD"
+```
+
+This separation ensures:
+- ✅ Database infrastructure managed in infrastructure repository (GitOps)
+- ✅ Application charts only manage their own namespace (security)
+- ✅ Multiple applications can share the same PostgreSQL cluster
+- ✅ Clear separation of concerns
 
 ## Installation
 
@@ -77,16 +137,16 @@ admin:
 # Database configuration
 database:
   enabled: true
-  cnpg:
-    instances: 3
-    storage:
-      size: 10Gi
-      storageClass: longhorn
+  host: postgresql-rw.database.svc.cluster.local
+  name: keycloak
+  username: keycloak
+  password: ""  # Auto-generated, must match infrastructure secret
 
 # MCP Server sidecar
 mcpServer:
-  enabled: true
-  port: 8081
+  oidcClient:
+    enabled: true
+    clientId: mcp-server
 
 # Ingress
 ingress:

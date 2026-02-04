@@ -51,35 +51,20 @@ admin:
   password: ""  # Will be auto-generated if empty
   existingSecret: ""  # Use existing secret instead
 
-# Database configuration using CNPG
+# Database configuration
 database:
   enabled: true
-  # Create Database CRD (set to false if deploying to different namespace)
-  createDatabaseCRD: true
-  # Database namespace (where CNPG cluster lives)
-  namespace: database
-  # CNPG cluster name
-  clusterName: postgresql
-  # Database connection
+  # Database connection details (must match infrastructure setup)
   host: postgresql-rw.database.svc.cluster.local
   port: 5432
   name: keycloak
   username: keycloak
-  password: ""  # Will be auto-generated if empty
+  password: ""  # Auto-generated if empty
   existingSecret: ""  # Use existing secret instead
-  # CNPG Cluster configuration (for reference/documentation)
-  cnpg:
-    instances: 3
-    storage:
-      size: 10Gi
-      storageClass: longhorn
-    postgresql:
-      parameters:
-        max_connections: "200"
-        shared_buffers: "256MB"
-    backup:
-      enabled: false
-      # Configuration for backups if needed
+
+  # Note: Database infrastructure (CNPG Cluster, Database CRD, managed role)
+  # must be created separately in your infrastructure repository.
+  # See README.md for required infrastructure setup.
 
 # Keycloak configuration
 keycloak:

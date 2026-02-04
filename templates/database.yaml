@@ -1,13 +1,10 @@
 {{- if .Values.database.enabled }}
 {{- if not .Values.database.existingSecret }}
 {{- /* Generate or preserve password */ -}}
-{{- $existingSecretLocal := lookup "v1" "Secret" .Release.Namespace (printf "%s-db-credentials" (include "keycloak.fullname" .)) -}}
-{{- $existingSecretDB := lookup "v1" "Secret" .Values.database.namespace (printf "%s-db-credentials" (include "keycloak.fullname" .)) -}}
+{{- $existingSecret := lookup "v1" "Secret" .Release.Namespace (printf "%s-db-credentials" (include "keycloak.fullname" .)) -}}
 {{- $defaultPassword := "" -}}
-{{- if $existingSecretLocal -}}
-  {{- $defaultPassword = index $existingSecretLocal.data "password" | b64dec -}}
-{{- else if $existingSecretDB -}}
-  {{- $defaultPassword = index $existingSecretDB.data "password" | b64dec -}}
+{{- if $existingSecret -}}
+  {{- $defaultPassword = index $existingSecret.data "password" | b64dec -}}
 {{- else -}}
   {{- $defaultPassword = randAlphaNum 32 -}}
 {{- end -}}
@@ -18,43 +15,11 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ include "keycloak.fullname" . }}-db-credentials
-  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "keycloak.labels" . | nindent 4 }}
 type: Opaque
 stringData:
   username: {{ .Values.database.username | quote }}
   password: {{ $finalPassword | quote }}
----
-# Secret for CNPG to read (in database namespace)
-# CNPG managed role will sync this password to PostgreSQL user
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ include "keycloak.fullname" . }}-db-credentials
-  namespace: {{ .Values.database.namespace }}
-  labels:
-    {{- include "keycloak.labels" . | nindent 4 }}
-    cnpg.io/reload: "true"
-type: kubernetes.io/basic-auth
-stringData:
-  username: {{ .Values.database.username | quote }}
-  password: {{ $finalPassword | quote }}
-{{- end }}
-{{- if .Values.database.createDatabaseCRD }}
----
-apiVersion: postgresql.cnpg.io/v1
-kind: Database
-metadata:
-  name: {{ include "keycloak.fullname" . }}-db
-  namespace: {{ .Values.database.namespace }}
-  labels:
-    {{- include "keycloak.labels" . | nindent 4 }}
-spec:
-  name: {{ .Values.database.name }}
-  cluster:
-    name: {{ .Values.database.clusterName }}
-  owner: {{ .Values.database.username }}
-  ensure: present
 {{- end }}
 {{- end }}
