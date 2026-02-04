@@ -25,8 +25,11 @@ spec:
       restartPolicy: OnFailure
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      containers:
-      - name: oidc-client-setup
+      volumes:
+      - name: shared-data
+        emptyDir: {}
+      initContainers:
+      - name: get-oidc-credentials
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command:
@@ -103,23 +106,14 @@ spec:
 
           echo "Client secret retrieved successfully"
 
-          # Save to Kubernetes secret
-          echo "Updating Kubernetes secret with client credentials..."
-          kubectl create secret generic {{ include "keycloak.fullname" . }}-mcp-client \
-            --from-literal=client-id="$CLIENT_ID" \
-            --from-literal=client-secret="$CLIENT_SECRET" \
-            --namespace={{ .Release.Namespace }} \
-            --dry-run=client -o yaml | kubectl apply -f -
+          # Write credentials to shared volume for kubectl container
+          echo "$CLIENT_ID" > /shared/client-id
+          echo "$CLIENT_SECRET" > /shared/client-secret
 
-          kubectl label secret {{ include "keycloak.fullname" . }}-mcp-client \
-            app.kubernetes.io/name={{ include "keycloak.name" . }} \
-            app.kubernetes.io/instance={{ .Release.Name }} \
-            app.kubernetes.io/managed-by={{ .Release.Service }} \
-            --overwrite
-
-          echo "OIDC client setup complete!"
-          echo "Client ID: $CLIENT_ID"
-          echo "Client secret stored in secret: {{ include "keycloak.fullname" . }}-mcp-client"
+          echo "Credentials written to shared volume"
+        volumeMounts:
+        - name: shared-data
+          mountPath: /shared
         env:
         - name: KEYCLOAK_ADMIN
           valueFrom:
@@ -140,5 +134,48 @@ spec:
           limits:
             cpu: 500m
             memory: 256Mi
+      containers:
+      - name: create-k8s-secret
+        image: bitnami/kubectl:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          echo "Creating Kubernetes secret with OIDC credentials..."
+
+          # Read credentials from shared volume
+          CLIENT_ID=$(cat /shared/client-id)
+          CLIENT_SECRET=$(cat /shared/client-secret)
+
+          # Create secret using kubectl
+          kubectl create secret generic {{ include "keycloak.fullname" . }}-mcp-client \
+            --from-literal=client-id="$CLIENT_ID" \
+            --from-literal=client-secret="$CLIENT_SECRET" \
+            --namespace={{ .Release.Namespace }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          # Add labels
+          kubectl label secret {{ include "keycloak.fullname" . }}-mcp-client \
+            app.kubernetes.io/name={{ include "keycloak.name" . }} \
+            app.kubernetes.io/instance={{ .Release.Name }} \
+            app.kubernetes.io/managed-by={{ .Release.Service }} \
+            --namespace={{ .Release.Namespace }} \
+            --overwrite
+
+          echo "OIDC client setup complete!"
+          echo "Client ID: $CLIENT_ID"
+          echo "Client secret stored in secret: {{ include "keycloak.fullname" . }}-mcp-client"
+        volumeMounts:
+        - name: shared-data
+          mountPath: /shared
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
       serviceAccountName: {{ include "keycloak.fullname" . }}-oidc-setup
 {{- end }}
