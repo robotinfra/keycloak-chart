@@ -1,0 +1,58 @@
+{{- if .Values.mcpServer.oidcClient.enabled }}
+---
+# ServiceAccount for OIDC client setup job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "keycloak.fullname" . }}-oidc-setup
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    app.kubernetes.io/component: oidc-client-setup
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+---
+# Role for OIDC client setup job
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "keycloak.fullname" . }}-oidc-setup
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    app.kubernetes.io/component: oidc-client-setup
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "update", "patch"]
+  resourceNames:
+  - {{ include "keycloak.fullname" . }}-mcp-client
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+---
+# RoleBinding for OIDC client setup job
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "keycloak.fullname" . }}-oidc-setup
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    app.kubernetes.io/component: oidc-client-setup
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "keycloak.fullname" . }}-oidc-setup
+subjects:
+- kind: ServiceAccount
+  name: {{ include "keycloak.fullname" . }}-oidc-setup
+  namespace: {{ .Release.Namespace }}
+{{- end }}

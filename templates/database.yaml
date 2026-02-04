@@ -1,4 +1,6 @@
 {{- if .Values.database.enabled }}
+{{- if not .Values.database.existingSecret }}
+{{- /* Generate or preserve password */ -}}
 {{- $existingSecret := lookup "v1" "Secret" .Release.Namespace (printf "%s-db-credentials" (include "keycloak.fullname" .)) -}}
 {{- $defaultPassword := "" -}}
 {{- if $existingSecret -}}
@@ -6,7 +8,9 @@
 {{- else -}}
   {{- $defaultPassword = randAlphaNum 32 -}}
 {{- end -}}
+{{- $finalPassword := .Values.database.password | default $defaultPassword -}}
 ---
+# Secret for Keycloak deployment to read (in release namespace)
 apiVersion: v1
 kind: Secret
 metadata:
@@ -16,20 +20,6 @@ metadata:
 type: Opaque
 stringData:
   username: {{ .Values.database.username | quote }}
-  password: {{ .Values.database.password | default $defaultPassword | quote }}
-{{- if .Values.database.createDatabaseCRD }}
----
-apiVersion: postgresql.cnpg.io/v1
-kind: Database
-metadata:
-  name: {{ include "keycloak.fullname" . }}-db
-  labels:
-    {{- include "keycloak.labels" . | nindent 4 }}
-spec:
-  name: {{ .Values.database.name }}
-  cluster:
-    name: postgresql
-  owner: {{ .Values.database.username }}
-  ensure: present
+  password: {{ $finalPassword | quote }}
 {{- end }}
 {{- end }}

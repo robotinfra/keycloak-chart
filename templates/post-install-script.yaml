@@ -1,0 +1,18 @@
+---
+# ConfigMap containing the post-install script rendered with chart values
+# Users can extract and run this script for manual setup or troubleshooting
+#
+# Extract the script:
+#   kubectl get configmap {{ include "keycloak.fullname" . }}-post-install-script \
+#     -n {{ .Release.Namespace }} -o jsonpath='{.data.post-install\.sh}' > post-install.sh
+#   chmod +x post-install.sh
+#   ./post-install.sh
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "keycloak.fullname" . }}-post-install-script
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+data:
+  post-install.sh: |
+{{ tpl (.Files.Get "scripts/post-install.sh") . | indent 4 }}
